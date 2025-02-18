@@ -28,28 +28,28 @@ A Flask-based web application that enables real-time multilingual communication 
 
 ## Installation
 
-# 1. Clone the repository:
+1. Clone the repository:
 ```bash
 git clone https://github.com/Hisham-cse/Meeting-Translation-System.git
 
 cd Meeting-Translation-System
 ```
 
-# 2. Create a virtual environment and activate it:
+2. Create a virtual environment and activate it:
 ```bash
 python -m venv venv
 source venv/bin/activate # On Windows: venv\Scripts\activate
 ```
-# 3. Install dependencies:
+3. Install dependencies:
 ```bash
 pip install -r requirements.txt
 ```
-# 4. Set up environment variables in `.env`:
+4. Set up environment variables in `.env`:
 ```bash
 SESSION_SECRET=your_secret_key
 MONGO_URI=your_mongodb_connection_string
 ```
-#5. Run the application:
+5. Run the application:
 ```bash
 python main.py
 ```
