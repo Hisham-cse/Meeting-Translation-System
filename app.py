@@ -1,49 +1,61 @@
 import os
+from dotenv import load_dotenv
 from flask import Flask, render_template, jsonify, request, session
-from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy.orm import DeclarativeBase
 import logging
 from datetime import datetime
 from googletrans import Translator
 from flask_socketio import SocketIO, emit, join_room, leave_room
 import random
 import string
+from flask_pymongo import PyMongo
+
+# Load environment variables from .ENV file
+load_dotenv()
 
 logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
-class Base(DeclarativeBase):
-    pass
-
-db = SQLAlchemy(model_class=Base)
 app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
-# Database configuration
-database_url = os.environ.get("DATABASE_URL")
-logger.info(f"Configuring database with URL type: {type(database_url)}")
-if database_url is None:
-    raise RuntimeError("DATABASE_URL environment variable is not set")
+try:
+    # Configure MongoDB
+    mongo_uri = os.environ.get('MONGO_URI')
+    if not mongo_uri:
+        raise RuntimeError("MONGO_URI environment variable is not set")
 
-app.config["SQLALCHEMY_DATABASE_URI"] = database_url
-app.config["SQLALCHEMY_ENGINE_OPTIONS"] = {
-    "pool_recycle": 300,
-    "pool_pre_ping": True,
-}
+    app.config['MONGO_URI'] = mongo_uri
+    app.config['MONGO_TLS'] = True
+    app.config['MONGO_TLS_ALLOW_INVALID_CERTIFICATES'] = True
+    app.config['MONGO_AUTH_SOURCE'] = 'admin'
+    app.config['MONGO_CONNECT'] = True
+    
+    mongo = PyMongo(app)
+    
+    # Test MongoDB connection
+    with app.app_context():
+        mongo.db.command('ping')
+        logger.info("MongoDB connection successful")
+        
+        # Create MongoDB collections if they don't exist
+        if 'participants' not in mongo.db.list_collection_names():
+            mongo.db.create_collection('participants')
+            logger.info("Created participants collection")
+        if 'rooms' not in mongo.db.list_collection_names():
+            mongo.db.create_collection('rooms')
+            logger.info("Created rooms collection")
 
-db.init_app(app)
-
-from models import Translation, Room, Participant
+except Exception as e:
+    logger.error(f"Database Connection Error: {str(e)}")
+    raise
 
 def generate_room_id():
     """Generate a random 6-character room ID"""
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 def get_translation(text, from_code, to_code):
-    """
-    Translate text using Google Translate
-    """
+    """Translate text using Google Translate"""
     try:
         translator = Translator()
         result = translator.translate(text, src=from_code, dest=to_code)
@@ -59,15 +71,24 @@ def index():
 
 @app.route('/create-room', methods=['POST'])
 def create_room():
-    room_id = generate_room_id()
-    room = Room(room_id=room_id)
-    db.session.add(room)
-    db.session.commit()
-    return jsonify({'room_id': room_id})
+    try:
+        room_id = generate_room_id()
+        
+        # Store in MongoDB
+        mongo.db.rooms.insert_one({
+            'room_id': room_id,
+            'created_at': datetime.utcnow(),
+            'active': True
+        })
+        
+        return jsonify({'room_id': room_id})
+    except Exception as e:
+        logger.error(f"Error creating room: {str(e)}")
+        return jsonify({'error': 'Failed to create room'}), 500
 
 @app.route('/join-room/<room_id>')
 def join_room_page(room_id):
-    room = Room.query.filter_by(room_id=room_id, active=True).first()
+    room = mongo.db.rooms.find_one({'room_id': room_id, 'active': True})
     if not room:
         return "Room not found", 404
     return render_template('room.html', room_id=room_id)
@@ -78,17 +99,19 @@ def on_join(data):
     name = data['name']
     language = data['language']
 
-    participant = Participant(
-        name=name,
-        room_id=room_id,
-        preferred_language=language
-    )
-    db.session.add(participant)
-    db.session.commit()
+    participant = {
+        'name': name,
+        'room_id': room_id,
+        'preferred_language': language,
+        'joined_at': datetime.utcnow()
+    }
+    
+    # Insert into MongoDB
+    mongo.db.participants.insert_one(participant)
 
     join_room(room_id)
-    participants = Participant.query.filter_by(room_id=room_id).all()
-    participant_list = [{'name': p.name, 'language': p.preferred_language} for p in participants]
+    participants = list(mongo.db.participants.find({'room_id': room_id}, {'_id': 0}))
+    participant_list = [{'name': p['name'], 'language': p['preferred_language']} for p in participants]
 
     emit('user_joined', {
         'name': name,
@@ -100,10 +123,7 @@ def on_join(data):
 def on_leave(data):
     room_id = data['room_id']
     name = data['name']
-
-    Participant.query.filter_by(name=name, room_id=room_id).delete()
-    db.session.commit()
-
+    mongo.db.participants.delete_one({'name': name, 'room_id': room_id})
     leave_room(room_id)
     emit('user_left', {'name': name}, room=room_id)
 
@@ -113,18 +133,15 @@ def handle_speech(data):
     text = data['text']
     from_language = data['from_language']
 
-    # Get all participants in the room
-    participants = Participant.query.filter_by(room_id=room_id).all()
-
-    # Translate and broadcast to each participant in their preferred language
+    participants = list(mongo.db.participants.find({'room_id': room_id}))
     for participant in participants:
-        if participant.preferred_language != from_language:
-            translated_text = get_translation(text, from_language, participant.preferred_language)
+        if participant['preferred_language'] != from_language:
+            translated_text = get_translation(text, from_language, participant['preferred_language'])
             emit('translated_speech', {
                 'original_text': text,
                 'translated_text': translated_text,
                 'from_language': from_language,
-                'to_language': participant.preferred_language
+                'to_language': participant['preferred_language']
             }, room=room_id)
 
 @socketio.on('reaction')
@@ -132,7 +149,6 @@ def handle_reaction(data):
     room_id = data['room_id']
     name = data['name']
     emoji = data['emoji']
-
     emit('reaction_received', {
         'name': name,
         'emoji': emoji
@@ -140,33 +156,25 @@ def handle_reaction(data):
 
 @app.route('/translate', methods=['POST'])
 def translate():
-    data = request.get_json()
-    text = data.get('text', '')
-    source_lang = data.get('sourceLang', 'en')
-    target_lang = data.get('targetLang', 'kn')
+    data = request.json
+    text = data.get('text')
+    source_lang = data.get('sourceLang')
+    target_lang = data.get('targetLang')
+    room_id = data.get('roomId')
 
-    # Perform translation
-    translated_text = get_translation(text, source_lang, target_lang)
+    translated = translator.translate(text, src=source_lang, dest=target_lang)
 
-    # Store translation in database
-    translation = Translation(
-        original_text=text,
-        translated_text=translated_text,
-        source_language=source_lang,
-        target_language=target_lang,
-        timestamp=datetime.utcnow()
-    )
-    db.session.add(translation)
-    db.session.commit()
+    translation = {
+        'original_text': text,
+        'translated_text': translated.text,
+        'source_language': source_lang,
+        'target_language': target_lang,
+        'timestamp': datetime.utcnow(),
+        'room_id': room_id
+    }
+    mongo.db.translations.insert_one(translation)
 
-    return jsonify({
-        'translation': translated_text,
-        'source_lang': source_lang,
-        'target_lang': target_lang
-    })
-
-with app.app_context():
-    db.create_all()
+    return jsonify({'translation': translated.text})
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)

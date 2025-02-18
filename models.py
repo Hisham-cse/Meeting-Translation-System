@@ -1,23 +1,24 @@
-from app import db
 from datetime import datetime
 
-class Translation(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    original_text = db.Column(db.Text, nullable=False)
-    translated_text = db.Column(db.Text, nullable=False)
-    source_language = db.Column(db.String(5), nullable=False)
-    target_language = db.Column(db.String(5), nullable=False)
-    timestamp = db.Column(db.DateTime, default=datetime.utcnow)
+# MongoDB schema reference (not actual code, just for documentation)
+translation_schema = {
+    "original_text": str,
+    "translated_text": str,
+    "source_language": str,
+    "target_language": str,
+    "timestamp": datetime,
+    "room_id": str
+}
 
-class Room(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    room_id = db.Column(db.String(10), unique=True, nullable=False)
-    created_at = db.Column(db.DateTime, default=datetime.utcnow)
-    active = db.Column(db.Boolean, default=True)
+room_schema = {
+    "room_id": str,
+    "created_at": datetime,
+    "active": bool
+}
 
-class Participant(db.Model):
-    id = db.Column(db.Integer, primary_key=True)
-    name = db.Column(db.String(100), nullable=False)
-    room_id = db.Column(db.String(10), nullable=False)
-    preferred_language = db.Column(db.String(5), nullable=False)
-    joined_at = db.Column(db.DateTime, default=datetime.utcnow)
+participant_schema = {
+    "name": str,
+    "room_id": str,
+    "preferred_language": str,
+    "joined_at": datetime
+}
