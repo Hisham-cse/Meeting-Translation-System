@@ -92,6 +92,13 @@
                                 <div class="card-body">
                                     <div id="translatedText" class="transcript-box"></div>
                                 </div>
+                                <!-- Add auto-speak toggle -->
+                                <div class="card-footer">
+                                    <div class="form-check form-switch">
+                                        <input class="form-check-input" type="checkbox" id="autoSpeak" checked>
+                                        <label class="form-check-label" for="autoSpeak">Auto-speak translations</label>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -122,6 +129,8 @@ document.addEventListener('DOMContentLoaded', function() {
     let audioContext = null;
     let analyser = null;
     let microphone = null;
+    let synthesis = window.speechSynthesis;
+    let speaking = false;
 
     // DOM Elements
     const joinForm = document.getElementById('joinForm');
@@ -138,6 +147,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const leaveRoomBtn = document.getElementById('leaveRoomBtn');
     const audioWaveform = document.getElementById('audioWaveform');
     const reactionBtns = document.querySelectorAll('.reaction-btn');
+    const autoSpeak = document.getElementById('autoSpeak');
 
     // Setup audio waveform
     const waveformCtx = audioWaveform.getContext('2d');
@@ -151,6 +161,23 @@ document.addEventListener('DOMContentLoaded', function() {
     } else {
         startButton.disabled = true;
         alert('Speech recognition is not supported in this browser.');
+    }
+
+    // Language mapping for speech synthesis
+    const languageMapping = {
+        'en': 'en-US',
+        'hi': 'hi-IN',
+        'kn': 'kn-IN'
+    };
+
+    function speakText(text, languageCode) {
+        if (!synthesis || !autoSpeak.checked || speaking) return;
+
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = languageMapping[languageCode] || languageCode;
+        utterance.onstart = () => { speaking = true; };
+        utterance.onend = () => { speaking = false; };
+        synthesis.speak(utterance);
     }
 
     joinButton.addEventListener('click', () => {
@@ -220,6 +247,9 @@ document.addEventListener('DOMContentLoaded', function() {
     socket.on('translated_speech', (data) => {
         translatedText.innerHTML += `<p><strong>${data.translated_text}</strong></p>`;
         translatedText.scrollTop = translatedText.scrollHeight;
+
+        // Speak the translated text
+        speakText(data.translated_text, data.to_language);
     });
 
     async function setupAudioVisualization() {
@@ -358,6 +388,10 @@ document.addEventListener('DOMContentLoaded', function() {
     20% { opacity: 1; transform: translateY(0); }
     80% { opacity: 1; transform: translateY(0); }
     100% { opacity: 0; transform: translateY(-20px); }
+}
+
+.form-switch {
+    padding-left: 2.5em;
 }
 </style>
 {% endblock %}
