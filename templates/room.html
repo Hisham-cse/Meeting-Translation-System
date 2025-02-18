@@ -7,11 +7,36 @@
         <div class="col-md-3">
             <div class="card">
                 <div class="card-header">
-                    <h5 class="mb-0">Room: <span class="badge bg-primary">{{ room_id }}</span></h5>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Room: <span class="badge bg-primary">{{ room_id }}</span></h5>
+                        <span class="badge bg-info" id="participantCount">0 participants</span>
+                    </div>
                 </div>
                 <div class="card-body">
-                    <div id="participantsList" class="list-group">
+                    <div id="participantsList" class="list-group mb-3">
                         <!-- Participants will be listed here -->
+                    </div>
+                    <div class="d-grid">
+                        <button id="leaveRoomBtn" class="btn btn-danger">
+                            <i class="fa fa-sign-out"></i> Leave Room
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Emoji Reactions -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Quick Reactions</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex flex-wrap gap-2">
+                        <button class="btn btn-outline-secondary reaction-btn" data-emoji="👍">👍</button>
+                        <button class="btn btn-outline-secondary reaction-btn" data-emoji="👏">👏</button>
+                        <button class="btn btn-outline-secondary reaction-btn" data-emoji="❤️">❤️</button>
+                        <button class="btn btn-outline-secondary reaction-btn" data-emoji="😊">😊</button>
+                        <button class="btn btn-outline-secondary reaction-btn" data-emoji="✋">✋</button>
+                        <button class="btn btn-outline-secondary reaction-btn" data-emoji="👋">👋</button>
                     </div>
                 </div>
             </div>
@@ -55,6 +80,10 @@
                                 <div class="card-body">
                                     <div id="originalText" class="transcript-box"></div>
                                 </div>
+                                <!-- Audio Waveform -->
+                                <div class="card-footer">
+                                    <canvas id="audioWaveform" height="50"></canvas>
+                                </div>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -66,7 +95,7 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="d-grid gap-2">
                         <button id="startButton" class="btn btn-primary">
                             <i class="fa fa-microphone"></i> Start Speaking
@@ -84,12 +113,16 @@
 
 {% block scripts %}
 <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 document.addEventListener('DOMContentLoaded', function() {
     const socket = io();
     let recognition = null;
     let isRecording = false;
-    
+    let audioContext = null;
+    let analyser = null;
+    let microphone = null;
+
     // DOM Elements
     const joinForm = document.getElementById('joinForm');
     const meetingArea = document.getElementById('meetingArea');
@@ -101,6 +134,14 @@ document.addEventListener('DOMContentLoaded', function() {
     const originalText = document.getElementById('originalText');
     const translatedText = document.getElementById('translatedText');
     const participantsList = document.getElementById('participantsList');
+    const participantCount = document.getElementById('participantCount');
+    const leaveRoomBtn = document.getElementById('leaveRoomBtn');
+    const audioWaveform = document.getElementById('audioWaveform');
+    const reactionBtns = document.querySelectorAll('.reaction-btn');
+
+    // Setup audio waveform
+    const waveformCtx = audioWaveform.getContext('2d');
+    let animationId;
 
     // Check for speech recognition support
     if ('webkitSpeechRecognition' in window) {
@@ -134,7 +175,30 @@ document.addEventListener('DOMContentLoaded', function() {
                 </div>
             </div>
         `).join('');
+        participantCount.textContent = `${participants.length} participant${participants.length !== 1 ? 's' : ''}`;
     }
+
+    leaveRoomBtn.addEventListener('click', () => {
+        if (isRecording) {
+            stopRecording();
+        }
+        socket.emit('leave', {
+            room_id: '{{ room_id }}',
+            name: userName.value
+        });
+        window.location.href = '/';
+    });
+
+    reactionBtns.forEach(btn => {
+        btn.addEventListener('click', () => {
+            const emoji = btn.dataset.emoji;
+            socket.emit('reaction', {
+                room_id: '{{ room_id }}',
+                name: userName.value,
+                emoji: emoji
+            });
+        });
+    });
 
     socket.on('user_joined', (data) => {
         updateParticipantsList(data.participants);
@@ -145,10 +209,66 @@ document.addEventListener('DOMContentLoaded', function() {
         translatedText.innerHTML += `<p class="text-muted"><em>${data.name} left the meeting</em></p>`;
     });
 
+    socket.on('reaction_received', (data) => {
+        const reactionDiv = document.createElement('div');
+        reactionDiv.className = 'reaction-popup';
+        reactionDiv.textContent = `${data.name}: ${data.emoji}`;
+        document.body.appendChild(reactionDiv);
+        setTimeout(() => reactionDiv.remove(), 2000);
+    });
+
     socket.on('translated_speech', (data) => {
         translatedText.innerHTML += `<p><strong>${data.translated_text}</strong></p>`;
         translatedText.scrollTop = translatedText.scrollHeight;
     });
+
+    async function setupAudioVisualization() {
+        try {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            microphone = audioContext.createMediaStreamSource(stream);
+            microphone.connect(analyser);
+            analyser.fftSize = 256;
+
+            const bufferLength = analyser.frequencyBinCount;
+            const dataArray = new Uint8Array(bufferLength);
+
+            function drawWaveform() {
+                animationId = requestAnimationFrame(drawWaveform);
+                analyser.getByteTimeDomainData(dataArray);
+
+                waveformCtx.fillStyle = 'rgb(33, 37, 41)';
+                waveformCtx.fillRect(0, 0, audioWaveform.width, audioWaveform.height);
+
+                waveformCtx.lineWidth = 2;
+                waveformCtx.strokeStyle = 'rgb(13, 110, 253)';
+                waveformCtx.beginPath();
+
+                const sliceWidth = audioWaveform.width / bufferLength;
+                let x = 0;
+
+                for (let i = 0; i < bufferLength; i++) {
+                    const v = dataArray[i] / 128.0;
+                    const y = v * audioWaveform.height / 2;
+
+                    if (i === 0) {
+                        waveformCtx.moveTo(x, y);
+                    } else {
+                        waveformCtx.lineTo(x, y);
+                    }
+                    x += sliceWidth;
+                }
+
+                waveformCtx.lineTo(audioWaveform.width, audioWaveform.height / 2);
+                waveformCtx.stroke();
+            }
+
+            drawWaveform();
+        } catch (error) {
+            console.error('Error setting up audio visualization:', error);
+        }
+    }
 
     function startRecording() {
         if (recognition) {
@@ -158,6 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
             startButton.disabled = true;
             stopButton.disabled = false;
             startButton.classList.add('recording');
+            setupAudioVisualization();
         }
     }
 
@@ -168,6 +289,13 @@ document.addEventListener('DOMContentLoaded', function() {
             startButton.disabled = false;
             stopButton.disabled = true;
             startButton.classList.remove('recording');
+            if (animationId) {
+                cancelAnimationFrame(animationId);
+            }
+            if (audioContext) {
+                audioContext.close();
+                audioContext = null;
+            }
         }
     }
 
@@ -212,4 +340,24 @@ document.addEventListener('DOMContentLoaded', function() {
     });
 });
 </script>
+
+<style>
+.reaction-popup {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background-color: rgba(0, 0, 0, 0.8);
+    color: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    animation: fadeInOut 2s ease-in-out;
+}
+
+@keyframes fadeInOut {
+    0% { opacity: 0; transform: translateY(20px); }
+    20% { opacity: 1; transform: translateY(0); }
+    80% { opacity: 1; transform: translateY(0); }
+    100% { opacity: 0; transform: translateY(-20px); }
+}
+</style>
 {% endblock %}

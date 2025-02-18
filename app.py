@@ -127,6 +127,17 @@ def handle_speech(data):
                 'to_language': participant.preferred_language
             }, room=room_id)
 
+@socketio.on('reaction')
+def handle_reaction(data):
+    room_id = data['room_id']
+    name = data['name']
+    emoji = data['emoji']
+
+    emit('reaction_received', {
+        'name': name,
+        'emoji': emoji
+    }, room=room_id)
+
 @app.route('/translate', methods=['POST'])
 def translate():
     data = request.get_json()

@@ -22,3 +22,24 @@
         opacity: 1;
     }
 }
+
+.reaction-btn {
+    font-size: 1.2rem;
+    min-width: 50px;
+    transition: transform 0.2s;
+}
+
+.reaction-btn:hover {
+    transform: scale(1.1);
+}
+
+#audioWaveform {
+    width: 100%;
+    background-color: var(--bs-dark);
+    border-radius: 4px;
+}
+
+.participant-count {
+    font-size: 0.9rem;
+    color: var(--bs-info);
+}
