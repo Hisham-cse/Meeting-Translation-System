@@ -2,54 +2,25 @@
 
 {% block content %}
 <div class="row">
-    <div class="col-md-12">
+    <div class="col-md-6 offset-md-3">
         <div class="card mb-4">
             <div class="card-body">
-                <h2 class="card-title mb-4">Real-time Meeting Translation</h2>
+                <h2 class="card-title text-center mb-4">Meeting Translator</h2>
 
-                <div class="row mb-3">
-                    <div class="col-md-6">
-                        <label for="sourceLang" class="form-label">Source Language</label>
-                        <select id="sourceLang" class="form-select">
-                            <option value="en">English</option>
-                            <option value="kn">Kannada</option>
-                            <option value="hi">Hindi</option>
-                        </select>
-                    </div>
-                    <div class="col-md-6">
-                        <label for="targetLang" class="form-label">Target Language</label>
-                        <select id="targetLang" class="form-select">
-                            <option value="kn">Kannada</option>
-                            <option value="en">English</option>
-                            <option value="hi">Hindi</option>
-                        </select>
-                    </div>
-                </div>
-
-                <div class="d-grid gap-2 mb-4">
-                    <button id="startButton" class="btn btn-primary">
-                        <i class="fa fa-microphone"></i> Start Recording
+                <div class="d-grid gap-3">
+                    <button id="createRoomBtn" class="btn btn-primary">
+                        <i class="fa fa-plus"></i> Create New Room
                     </button>
-                    <button id="stopButton" class="btn btn-danger" disabled>
-                        <i class="fa fa-stop"></i> Stop Recording
-                    </button>
-                </div>
 
-                <div class="row">
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">Original Text</div>
-                            <div class="card-body">
-                                <div id="originalText" class="transcript-box"></div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <div class="card">
-                            <div class="card-header">Translated Text</div>
-                            <div class="card-body">
-                                <div id="translatedText" class="transcript-box"></div>
-                            </div>
+                    <div class="text-center">- OR -</div>
+
+                    <div class="form-group">
+                        <label for="roomId" class="form-label">Join Existing Room</label>
+                        <div class="input-group">
+                            <input type="text" id="roomId" class="form-control" placeholder="Enter Room ID">
+                            <button id="joinRoomBtn" class="btn btn-secondary">
+                                <i class="fa fa-sign-in"></i> Join
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -60,5 +31,30 @@
 {% endblock %}
 
 {% block scripts %}
-<script src="{{ url_for('static', filename='js/speech.js') }}"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const createRoomBtn = document.getElementById('createRoomBtn');
+    const joinRoomBtn = document.getElementById('joinRoomBtn');
+    const roomIdInput = document.getElementById('roomId');
+
+    createRoomBtn.addEventListener('click', async () => {
+        try {
+            const response = await fetch('/create-room', {
+                method: 'POST'
+            });
+            const data = await response.json();
+            window.location.href = `/join-room/${data.room_id}`;
+        } catch (error) {
+            console.error('Error creating room:', error);
+        }
+    });
+
+    joinRoomBtn.addEventListener('click', () => {
+        const roomId = roomIdInput.value.trim();
+        if (roomId) {
+            window.location.href = `/join-room/${roomId}`;
+        }
+    });
+});
+</script>
 {% endblock %}

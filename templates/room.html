@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container-fluid">
+    <div class="row">
+        <!-- Participant panel -->
+        <div class="col-md-3">
+            <div class="card">
+                <div class="card-header">
+                    <h5 class="mb-0">Room: <span class="badge bg-primary">{{ room_id }}</span></h5>
+                </div>
+                <div class="card-body">
+                    <div id="participantsList" class="list-group">
+                        <!-- Participants will be listed here -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main content -->
+        <div class="col-md-9">
+            <!-- Join Form -->
+            <div id="joinForm" class="card mb-4">
+                <div class="card-body">
+                    <h3>Join Meeting</h3>
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label for="userName" class="form-label">Your Name</label>
+                            <input type="text" id="userName" class="form-control" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label for="language" class="form-label">Preferred Language</label>
+                            <select id="language" class="form-select">
+                                <option value="en">English</option>
+                                <option value="kn">Kannada</option>
+                                <option value="hi">Hindi</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button id="joinButton" class="btn btn-primary">
+                                <i class="fa fa-sign-in"></i> Join Meeting
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Meeting Area (initially hidden) -->
+            <div id="meetingArea" class="card" style="display: none;">
+                <div class="card-body">
+                    <div class="row mb-4">
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">Original Speech</div>
+                                <div class="card-body">
+                                    <div id="originalText" class="transcript-box"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="card">
+                                <div class="card-header">Translated Speech</div>
+                                <div class="card-body">
+                                    <div id="translatedText" class="transcript-box"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button id="startButton" class="btn btn-primary">
+                            <i class="fa fa-microphone"></i> Start Speaking
+                        </button>
+                        <button id="stopButton" class="btn btn-danger" disabled>
+                            <i class="fa fa-stop"></i> Stop Speaking
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const socket = io();
+    let recognition = null;
+    let isRecording = false;
+    
+    // DOM Elements
+    const joinForm = document.getElementById('joinForm');
+    const meetingArea = document.getElementById('meetingArea');
+    const userName = document.getElementById('userName');
+    const language = document.getElementById('language');
+    const joinButton = document.getElementById('joinButton');
+    const startButton = document.getElementById('startButton');
+    const stopButton = document.getElementById('stopButton');
+    const originalText = document.getElementById('originalText');
+    const translatedText = document.getElementById('translatedText');
+    const participantsList = document.getElementById('participantsList');
+
+    // Check for speech recognition support
+    if ('webkitSpeechRecognition' in window) {
+        recognition = new webkitSpeechRecognition();
+        recognition.continuous = true;
+        recognition.interimResults = true;
+    } else {
+        startButton.disabled = true;
+        alert('Speech recognition is not supported in this browser.');
+    }
+
+    joinButton.addEventListener('click', () => {
+        const name = userName.value.trim();
+        if (name) {
+            socket.emit('join', {
+                room_id: '{{ room_id }}',
+                name: name,
+                language: language.value
+            });
+            joinForm.style.display = 'none';
+            meetingArea.style.display = 'block';
+        }
+    });
+
+    function updateParticipantsList(participants) {
+        participantsList.innerHTML = participants.map(p => `
+            <div class="list-group-item">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span>${p.name}</span>
+                    <span class="badge bg-secondary">${p.language.toUpperCase()}</span>
+                </div>
+            </div>
+        `).join('');
+    }
+
+    socket.on('user_joined', (data) => {
+        updateParticipantsList(data.participants);
+        translatedText.innerHTML += `<p class="text-muted"><em>${data.name} joined the meeting</em></p>`;
+    });
+
+    socket.on('user_left', (data) => {
+        translatedText.innerHTML += `<p class="text-muted"><em>${data.name} left the meeting</em></p>`;
+    });
+
+    socket.on('translated_speech', (data) => {
+        translatedText.innerHTML += `<p><strong>${data.translated_text}</strong></p>`;
+        translatedText.scrollTop = translatedText.scrollHeight;
+    });
+
+    function startRecording() {
+        if (recognition) {
+            recognition.lang = language.value;
+            recognition.start();
+            isRecording = true;
+            startButton.disabled = true;
+            stopButton.disabled = false;
+            startButton.classList.add('recording');
+        }
+    }
+
+    function stopRecording() {
+        if (recognition) {
+            recognition.stop();
+            isRecording = false;
+            startButton.disabled = false;
+            stopButton.disabled = true;
+            startButton.classList.remove('recording');
+        }
+    }
+
+    if (recognition) {
+        recognition.onresult = function(event) {
+            let interimTranscript = '';
+            let finalTranscript = '';
+
+            for (let i = event.resultIndex; i < event.results.length; ++i) {
+                const transcript = event.results[i][0].transcript;
+                if (event.results[i].isFinal) {
+                    finalTranscript += transcript;
+                    socket.emit('speech', {
+                        room_id: '{{ room_id }}',
+                        text: transcript,
+                        from_language: language.value
+                    });
+                } else {
+                    interimTranscript += transcript;
+                }
+            }
+
+            originalText.innerHTML = `<p>${finalTranscript}</p><i>${interimTranscript}</i>`;
+            originalText.scrollTop = originalText.scrollHeight;
+        };
+
+        recognition.onerror = function(event) {
+            console.error('Speech recognition error:', event.error);
+            stopRecording();
+        };
+    }
+
+    startButton.addEventListener('click', startRecording);
+    stopButton.addEventListener('click', stopRecording);
+
+    // Handle page unload
+    window.addEventListener('beforeunload', () => {
+        socket.emit('leave', {
+            room_id: '{{ room_id }}',
+            name: userName.value
+        });
+    });
+});
+</script>
+{% endblock %}
