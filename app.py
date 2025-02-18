@@ -31,6 +31,67 @@ db.init_app(app)
 
 from models import Translation
 
+# Simple translation dictionaries for demo purposes
+TRANSLATIONS = {
+    'en': {
+        'hi': {
+            'hello': 'नमस्ते',
+            'good morning': 'शुभ प्रभात',
+            'thank you': 'धन्यवाद'
+        },
+        'kn': {
+            'hello': 'ನಮಸ್ಕಾರ',
+            'good morning': 'ಶುಭೋದಯ',
+            'thank you': 'ಧನ್ಯವಾದಗಳು'
+        }
+    },
+    'hi': {
+        'en': {
+            'नमस्ते': 'hello',
+            'शुभ प्रभात': 'good morning',
+            'धन्यवाद': 'thank you'
+        },
+        'kn': {
+            'नमस्ते': 'ನಮಸ್ಕಾರ',
+            'शुभ प्रभात': 'ಶುಭೋದಯ',
+            'धन्यवाद': 'ಧನ್ಯವಾದಗಳು'
+        }
+    },
+    'kn': {
+        'en': {
+            'ನಮಸ್ಕಾರ': 'hello',
+            'ಶುಭೋದಯ': 'good morning',
+            'ಧನ್ಯವಾದಗಳು': 'thank you'
+        },
+        'hi': {
+            'ನಮಸ್ಕಾರ': 'नमस्ते',
+            'ಶುಭೋದಯ': 'शुभ प्रभात',
+            'ಧನ್ಯವಾದಗಳು': 'धन्यवाद'
+        }
+    }
+}
+
+def get_translation(text, from_code, to_code):
+    """
+    Simple dictionary-based translation for demo purposes
+    """
+    try:
+        # Convert text to lowercase for matching
+        text_lower = text.lower()
+
+        # Check if we have a translation
+        if from_code in TRANSLATIONS and to_code in TRANSLATIONS[from_code]:
+            # Try to find the translation
+            translation = TRANSLATIONS[from_code][to_code].get(text_lower, text)
+            return translation
+        else:
+            logger.warning(f"Translation not available for {from_code} to {to_code}")
+            return text
+
+    except Exception as e:
+        logger.error(f"Translation error: {str(e)}")
+        return text
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -40,12 +101,15 @@ def translate():
     data = request.get_json()
     text = data.get('text', '')
     source_lang = data.get('sourceLang', 'en')
-    target_lang = data.get('targetLang', 'es')
+    target_lang = data.get('targetLang', 'kn')
+
+    # Perform translation
+    translated_text = get_translation(text, source_lang, target_lang)
 
     # Store translation in database
     translation = Translation(
         original_text=text,
-        translated_text=text,  # In a real implementation, this would be the translated text
+        translated_text=translated_text,
         source_language=source_lang,
         target_language=target_lang,
         timestamp=datetime.utcnow()
@@ -54,7 +118,7 @@ def translate():
     db.session.commit()
 
     return jsonify({
-        'translation': text,
+        'translation': translated_text,
         'source_lang': source_lang,
         'target_lang': target_lang
     })
