@@ -1,0 +1,66 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-12">
+        <div class="card mb-4">
+            <div class="card-body">
+                <h2 class="card-title mb-4">Real-time Meeting Translation</h2>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6">
+                        <label for="sourceLang" class="form-label">Source Language</label>
+                        <select id="sourceLang" class="form-select">
+                            <option value="en">English</option>
+                            <option value="es">Spanish</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                        </select>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="targetLang" class="form-label">Target Language</label>
+                        <select id="targetLang" class="form-select">
+                            <option value="es">Spanish</option>
+                            <option value="en">English</option>
+                            <option value="fr">French</option>
+                            <option value="de">German</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="d-grid gap-2 mb-4">
+                    <button id="startButton" class="btn btn-primary">
+                        <i class="fa fa-microphone"></i> Start Recording
+                    </button>
+                    <button id="stopButton" class="btn btn-danger" disabled>
+                        <i class="fa fa-stop"></i> Stop Recording
+                    </button>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Original Text</div>
+                            <div class="card-body">
+                                <div id="originalText" class="transcript-box"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="card">
+                            <div class="card-header">Translated Text</div>
+                            <div class="card-body">
+                                <div id="translatedText" class="transcript-box"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/speech.js') }}"></script>
+{% endblock %}
