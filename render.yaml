@@ -1,0 +1,11 @@
+services:
+  - type: web
+    name: meeting-translator
+    env: python
+    buildCommand: pip install -r requirements2.txt
+    startCommand: gunicorn app:app --worker-class eventlet -w 1
+    envVars:
+      - key: SESSION_SECRET
+        sync: false
+      - key: MONGO_URI
+        sync: false 
