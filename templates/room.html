@@ -24,6 +24,24 @@
                 </div>
             </div>
 
+            <!-- Language Status -->
+            <div class="card mt-3">
+                <div class="card-header">
+                    <h5 class="mb-0">Your Language</h5>
+                </div>
+                <div class="card-body">
+                    <div class="d-flex align-items-center">
+                        <span class="badge bg-success me-2" id="currentLanguage">English</span>
+                        <button id="changeLangBtn" class="btn btn-sm btn-outline-primary">Change</button>
+                    </div>
+                    <select id="newLanguage" class="form-select mt-2" style="display: none;">
+                        <option value="en">English</option>
+                        <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                        <option value="hi">हिंदी (Hindi)</option>
+                    </select>
+                </div>
+            </div>
+
             <!-- Emoji Reactions -->
             <div class="card mt-3">
                 <div class="card-header">
@@ -37,6 +55,8 @@
                         <button class="btn btn-outline-secondary reaction-btn" data-emoji="😊">😊</button>
                         <button class="btn btn-outline-secondary reaction-btn" data-emoji="✋">✋</button>
                         <button class="btn btn-outline-secondary reaction-btn" data-emoji="👋">👋</button>
+                        <button class="btn btn-outline-secondary reaction-btn" data-emoji="🤔">🤔</button>
+                        <button class="btn btn-outline-secondary reaction-btn" data-emoji="👌">👌</button>
                     </div>
                 </div>
             </div>
@@ -57,9 +77,17 @@
                             <label for="language" class="form-label">Preferred Language</label>
                             <select id="language" class="form-select">
                                 <option value="en">English</option>
-                                <option value="kn">Kannada</option>
-                                <option value="hi">Hindi</option>
+                                <option value="kn">ಕನ್ನಡ (Kannada)</option>
+                                <option value="hi">हिंदी (Hindi)</option>
                             </select>
+                        </div>
+                        <div class="col-12">
+                            <div class="alert alert-info">
+                                <small>
+                                    <i class="fa fa-info-circle"></i>
+                                    Select your preferred language. All speech will be automatically translated to your language.
+                                </small>
+                            </div>
                         </div>
                         <div class="col-12">
                             <button id="joinButton" class="btn btn-primary">
@@ -76,40 +104,92 @@
                     <div class="row mb-4">
                         <div class="col-md-6">
                             <div class="card">
-                                <div class="card-header">Original Speech</div>
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <span>Original Speech</span>
+                                    <span class="badge bg-secondary" id="originalLangBadge">--</span>
+                                </div>
                                 <div class="card-body">
                                     <div id="originalText" class="transcript-box"></div>
                                 </div>
                                 <!-- Audio Waveform -->
                                 <div class="card-footer">
                                     <canvas id="audioWaveform" height="50"></canvas>
+                                    <div class="mt-2">
+                                        <small class="text-muted">
+                                            <span id="recordingStatus">Ready to record</span>
+                                        </small>
+                                    </div>
                                 </div>
                             </div>
                         </div>
                         <div class="col-md-6">
                             <div class="card">
-                                <div class="card-header">Translated Speech</div>
+                                <div class="card-header d-flex justify-content-between align-items-center">
+                                    <span>Translated Speech</span>
+                                    <span class="badge bg-primary" id="translatedLangBadge">--</span>
+                                </div>
                                 <div class="card-body">
                                     <div id="translatedText" class="transcript-box"></div>
                                 </div>
-                                <!-- Add auto-speak toggle -->
+                                <!-- Translation controls -->
                                 <div class="card-footer">
-                                    <div class="form-check form-switch">
-                                        <input class="form-check-input" type="checkbox" id="autoSpeak" checked>
-                                        <label class="form-check-label" for="autoSpeak">Auto-speak translations</label>
+                                    <div class="row">
+                                        <div class="col-6">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="autoSpeak" checked>
+                                                <label class="form-check-label" for="autoSpeak">Auto-speak</label>
+                                            </div>
+                                        </div>
+                                        <div class="col-6">
+                                            <div class="form-check form-switch">
+                                                <input class="form-check-input" type="checkbox" id="showOriginal" checked>
+                                                <label class="form-check-label" for="showOriginal">Show original</label>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
                         </div>
                     </div>
 
-                    <div class="d-grid gap-2">
-                        <button id="startButton" class="btn btn-primary">
-                            <i class="fa fa-microphone"></i> Start Speaking
-                        </button>
-                        <button id="stopButton" class="btn btn-danger" disabled>
-                            <i class="fa fa-stop"></i> Stop Speaking
-                        </button>
+                    <!-- Translation History -->
+                    <div class="card mb-4">
+                        <div class="card-header d-flex justify-content-between align-items-center">
+                            <h5 class="mb-0">Translation History</h5>
+                            <button id="clearHistoryBtn" class="btn btn-sm btn-outline-danger">
+                                <i class="fa fa-trash"></i> Clear
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="translationHistory" class="history-container">
+                                <!-- Translation history will appear here -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Recording Controls -->
+                    <div class="row">
+                        <div class="col-md-8">
+                            <div class="d-grid gap-2">
+                                <button id="startButton" class="btn btn-primary btn-lg">
+                                    <i class="fa fa-microphone"></i> Start Speaking
+                                </button>
+                                <button id="stopButton" class="btn btn-danger btn-lg" disabled>
+                                    <i class="fa fa-stop"></i> Stop Speaking
+                                </button>
+                            </div>
+                        </div>
+                        <div class="col-md-4">
+                            <div class="card">
+                                <div class="card-body text-center">
+                                    <h6>Speech Recognition</h6>
+                                    <div id="speechStatus" class="badge bg-secondary">Inactive</div>
+                                    <div class="mt-2">
+                                        <small class="text-muted">Confidence: <span id="confidenceLevel">--</span></small>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -131,11 +211,34 @@ document.addEventListener('DOMContentLoaded', function() {
     let microphone = null;
     let synthesis = window.speechSynthesis;
     let speaking = false;
+    let currentUserLanguage = 'en';
+    let userName = '';
+
+    // Language display names
+    const languageNames = {
+        'en': 'English',
+        'hi': 'हिंदी (Hindi)',
+        'kn': 'ಕನ್ನಡ (Kannada)'
+    };
+
+    // Language mapping for speech recognition
+    const speechRecognitionLangs = {
+        'en': 'en-US',
+        'hi': 'hi-IN',
+        'kn': 'kn-IN'
+    };
+
+    // Language mapping for speech synthesis
+    const speechSynthesisLangs = {
+        'en': 'en-US',
+        'hi': 'hi-IN',
+        'kn': 'kn-IN'
+    };
 
     // DOM Elements
     const joinForm = document.getElementById('joinForm');
     const meetingArea = document.getElementById('meetingArea');
-    const userName = document.getElementById('userName');
+    const userNameInput = document.getElementById('userName');
     const language = document.getElementById('language');
     const joinButton = document.getElementById('joinButton');
     const startButton = document.getElementById('startButton');
@@ -148,6 +251,17 @@ document.addEventListener('DOMContentLoaded', function() {
     const audioWaveform = document.getElementById('audioWaveform');
     const reactionBtns = document.querySelectorAll('.reaction-btn');
     const autoSpeak = document.getElementById('autoSpeak');
+    const showOriginal = document.getElementById('showOriginal');
+    const currentLanguage = document.getElementById('currentLanguage');
+    const changeLangBtn = document.getElementById('changeLangBtn');
+    const newLanguage = document.getElementById('newLanguage');
+    const originalLangBadge = document.getElementById('originalLangBadge');
+    const translatedLangBadge = document.getElementById('translatedLangBadge');
+    const recordingStatus = document.getElementById('recordingStatus');
+    const speechStatus = document.getElementById('speechStatus');
+    const confidenceLevel = document.getElementById('confidenceLevel');
+    const translationHistory = document.getElementById('translationHistory');
+    const clearHistoryBtn = document.getElementById('clearHistoryBtn');
 
     // Setup audio waveform
     const waveformCtx = audioWaveform.getContext('2d');
@@ -158,47 +272,117 @@ document.addEventListener('DOMContentLoaded', function() {
         recognition = new webkitSpeechRecognition();
         recognition.continuous = true;
         recognition.interimResults = true;
+        recognition.maxAlternatives = 1;
     } else {
         startButton.disabled = true;
-        alert('Speech recognition is not supported in this browser.');
+        speechStatus.textContent = 'Not Supported';
+        speechStatus.className = 'badge bg-danger';
+        alert('Speech recognition is not supported in this browser. Please use Chrome or Edge.');
     }
 
-    // Language mapping for speech synthesis
-    const languageMapping = {
-        'en': 'en-US',
-        'hi': 'hi-IN',
-        'kn': 'kn-IN'
-    };
+    function updateLanguageDisplay() {
+        currentLanguage.textContent = languageNames[currentUserLanguage];
+        translatedLangBadge.textContent = languageNames[currentUserLanguage];
+    }
 
     function speakText(text, languageCode) {
-        if (!synthesis || !autoSpeak.checked || speaking) return;
+        if (!synthesis || !autoSpeak.checked || speaking || !text.trim()) return;
+
+        // Stop any current speech
+        synthesis.cancel();
 
         const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = languageMapping[languageCode] || languageCode;
-        utterance.onstart = () => { speaking = true; };
-        utterance.onend = () => { speaking = false; };
+        utterance.lang = speechSynthesisLangs[languageCode] || 'en-US';
+        utterance.rate = 0.9;
+        utterance.volume = 0.8;
+        
+        utterance.onstart = () => { 
+            speaking = true;
+            speechStatus.textContent = 'Speaking';
+            speechStatus.className = 'badge bg-info';
+        };
+        utterance.onend = () => { 
+            speaking = false;
+            speechStatus.textContent = isRecording ? 'Recording' : 'Inactive';
+            speechStatus.className = isRecording ? 'badge bg-success' : 'badge bg-secondary';
+        };
+        utterance.onerror = () => {
+            speaking = false;
+            console.error('Speech synthesis error');
+        };
+
         synthesis.speak(utterance);
     }
 
+    function addToHistory(original, translated, fromLang, toLang) {
+        if (!showOriginal.checked && !translated) return;
+
+        const historyItem = document.createElement('div');
+        historyItem.className = 'history-item mb-2 p-2 border rounded';
+        
+        const timestamp = new Date().toLocaleTimeString();
+        historyItem.innerHTML = `
+            <div class="d-flex justify-content-between">
+                <small class="text-muted">${timestamp}</small>
+                <small class="text-muted">${languageNames[fromLang]} → ${languageNames[toLang]}</small>
+            </div>
+            ${showOriginal.checked ? `<div class="original-text text-muted small">${original}</div>` : ''}
+            <div class="translated-text">${translated}</div>
+        `;
+
+        translationHistory.insertBefore(historyItem, translationHistory.firstChild);
+
+        // Keep only last 20 items
+        while (translationHistory.children.length > 20) {
+            translationHistory.removeChild(translationHistory.lastChild);
+        }
+    }
+
     joinButton.addEventListener('click', () => {
-        const name = userName.value.trim();
+        const name = userNameInput.value.trim();
         if (name) {
+            userName = name;
+            currentUserLanguage = language.value;
+            updateLanguageDisplay();
+            
             socket.emit('join', {
                 room_id: '{{ room_id }}',
                 name: name,
-                language: language.value
+                language: currentUserLanguage
             });
             joinForm.style.display = 'none';
             meetingArea.style.display = 'block';
         }
     });
 
+    changeLangBtn.addEventListener('click', () => {
+        newLanguage.style.display = newLanguage.style.display === 'none' ? 'block' : 'none';
+        if (newLanguage.style.display === 'block') {
+            newLanguage.value = currentUserLanguage;
+        }
+    });
+
+    newLanguage.addEventListener('change', () => {
+        currentUserLanguage = newLanguage.value;
+        updateLanguageDisplay();
+        newLanguage.style.display = 'none';
+        
+        // Update speech recognition language
+        if (recognition && !isRecording) {
+            recognition.lang = speechRecognitionLangs[currentUserLanguage];
+        }
+    });
+
+    clearHistoryBtn.addEventListener('click', () => {
+        translationHistory.innerHTML = '';
+    });
+
     function updateParticipantsList(participants) {
         participantsList.innerHTML = participants.map(p => `
             <div class="list-group-item">
                 <div class="d-flex justify-content-between align-items-center">
-                    <span>${p.name}</span>
-                    <span class="badge bg-secondary">${p.language.toUpperCase()}</span>
+                    <span><i class="fa fa-user"></i> ${p.name}</span>
+                    <span class="badge bg-secondary">${languageNames[p.language]}</span>
                 </div>
             </div>
         `).join('');
@@ -211,7 +395,7 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         socket.emit('leave', {
             room_id: '{{ room_id }}',
-            name: userName.value
+            name: userName
         });
         window.location.href = '/';
     });
@@ -221,42 +405,85 @@ document.addEventListener('DOMContentLoaded', function() {
             const emoji = btn.dataset.emoji;
             socket.emit('reaction', {
                 room_id: '{{ room_id }}',
-                name: userName.value,
+                name: userName,
                 emoji: emoji
             });
+            
+            // Visual feedback
+            btn.classList.add('active');
+            setTimeout(() => btn.classList.remove('active'), 200);
         });
     });
 
     socket.on('user_joined', (data) => {
         updateParticipantsList(data.participants);
-        translatedText.innerHTML += `<p class="text-muted"><em>${data.name} joined the meeting</em></p>`;
+        const joinMessage = `${data.name} joined the meeting (${languageNames[data.language]})`;
+        translatedText.innerHTML += `<p class="text-success"><em><i class="fa fa-sign-in"></i> ${joinMessage}</em></p>`;
+        translatedText.scrollTop = translatedText.scrollHeight;
     });
 
     socket.on('user_left', (data) => {
-        translatedText.innerHTML += `<p class="text-muted"><em>${data.name} left the meeting</em></p>`;
+        const leaveMessage = `${data.name} left the meeting`;
+        translatedText.innerHTML += `<p class="text-warning"><em><i class="fa fa-sign-out"></i> ${leaveMessage}</em></p>`;
+        translatedText.scrollTop = translatedText.scrollHeight;
     });
 
     socket.on('reaction_received', (data) => {
         const reactionDiv = document.createElement('div');
         reactionDiv.className = 'reaction-popup';
-        reactionDiv.textContent = `${data.name}: ${data.emoji}`;
+        reactionDiv.innerHTML = `<strong>${data.name}:</strong> ${data.emoji}`;
+        reactionDiv.style.cssText = `
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px 20px;
+            border-radius: 20px;
+            z-index: 1000;
+            animation: fadeInOut 3s ease-in-out forwards;
+        `;
         document.body.appendChild(reactionDiv);
-        setTimeout(() => reactionDiv.remove(), 2000);
+        setTimeout(() => reactionDiv.remove(), 3000);
+    });
+
+    socket.on('speech_received', (data) => {
+        const displayText = showOriginal.checked ? 
+            `<p><strong>Original (${languageNames[data.from_language]}):</strong> ${data.original_text}</p>` : '';
+        originalText.innerHTML += displayText;
+        originalLangBadge.textContent = languageNames[data.from_language];
+        originalText.scrollTop = originalText.scrollHeight;
     });
 
     socket.on('translated_speech', (data) => {
-        translatedText.innerHTML += `<p><strong>${data.translated_text}</strong></p>`;
-        translatedText.scrollTop = translatedText.scrollHeight;
+        if (data.to_language === currentUserLanguage) {
+            const translatedDisplay = `<p><strong>${data.translated_text}</strong></p>`;
+            translatedText.innerHTML += translatedDisplay;
+            translatedText.scrollTop = translatedText.scrollHeight;
 
-        // Speak the translated text
-        speakText(data.translated_text, data.to_language);
+            // Add to history
+            addToHistory(data.original_text, data.translated_text, data.from_language, data.to_language);
+
+            // Speak the translated text
+            speakText(data.translated_text, data.to_language);
+        }
     });
 
     async function setupAudioVisualization() {
         try {
+            if (audioContext) {
+                await audioContext.close();
+            }
+            
             audioContext = new (window.AudioContext || window.webkitAudioContext)();
             analyser = audioContext.createAnalyser();
-            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            const stream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
             microphone = audioContext.createMediaStreamSource(stream);
             microphone.connect(analyser);
             analyser.fftSize = 256;
@@ -265,6 +492,8 @@ document.addEventListener('DOMContentLoaded', function() {
             const dataArray = new Uint8Array(bufferLength);
 
             function drawWaveform() {
+                if (!isRecording) return;
+                
                 animationId = requestAnimationFrame(drawWaveform);
                 analyser.getByteTimeDomainData(dataArray);
 
@@ -297,17 +526,21 @@ document.addEventListener('DOMContentLoaded', function() {
             drawWaveform();
         } catch (error) {
             console.error('Error setting up audio visualization:', error);
+            recordingStatus.textContent = 'Audio access denied';
         }
     }
 
     function startRecording() {
         if (recognition) {
-            recognition.lang = language.value;
+            recognition.lang = speechRecognitionLangs[currentUserLanguage] || 'en-US';
             recognition.start();
             isRecording = true;
             startButton.disabled = true;
             stopButton.disabled = false;
             startButton.classList.add('recording');
+            speechStatus.textContent = 'Recording';
+            speechStatus.className = 'badge bg-success';
+            recordingStatus.textContent = 'Recording...';
             setupAudioVisualization();
         }
     }
@@ -319,6 +552,9 @@ document.addEventListener('DOMContentLoaded', function() {
             startButton.disabled = false;
             stopButton.disabled = true;
             startButton.classList.remove('recording');
+            speechStatus.textContent = 'Inactive';
+            speechStatus.className = 'badge bg-secondary';
+            recordingStatus.textContent = 'Recording stopped';
             if (animationId) {
                 cancelAnimationFrame(animationId);
             }
@@ -336,25 +572,46 @@ document.addEventListener('DOMContentLoaded', function() {
 
             for (let i = event.resultIndex; i < event.results.length; ++i) {
                 const transcript = event.results[i][0].transcript;
+                const confidence = event.results[i][0].confidence;
+                
                 if (event.results[i].isFinal) {
                     finalTranscript += transcript;
+                    confidenceLevel.textContent = `${Math.round(confidence * 100)}%`;
+                    
+                    // Send to server for translation
                     socket.emit('speech', {
                         room_id: '{{ room_id }}',
-                        text: transcript,
-                        from_language: language.value
+                        text: transcript.trim(),
+                        from_language: currentUserLanguage
                     });
                 } else {
                     interimTranscript += transcript;
                 }
             }
 
-            originalText.innerHTML = `<p>${finalTranscript}</p><i>${interimTranscript}</i>`;
+            // Display in original text box
+            const displayText = finalTranscript + (interimTranscript ? `<i class="text-muted">${interimTranscript}</i>` : '');
+            originalText.innerHTML = `<p>${displayText}</p>`;
             originalText.scrollTop = originalText.scrollHeight;
         };
 
         recognition.onerror = function(event) {
             console.error('Speech recognition error:', event.error);
+            speechStatus.textContent = 'Error';
+            speechStatus.className = 'badge bg-danger';
+            recordingStatus.textContent = `Error: ${event.error}`;
             stopRecording();
+        };
+
+        recognition.onend = function() {
+            if (isRecording) {
+                // Restart recognition if it stops unexpectedly
+                setTimeout(() => {
+                    if (isRecording) {
+                        recognition.start();
+                    }
+                }, 100);
+            }
         };
     }
 
@@ -363,24 +620,37 @@ document.addEventListener('DOMContentLoaded', function() {
 
     // Handle page unload
     window.addEventListener('beforeunload', () => {
-        socket.emit('leave', {
-            room_id: '{{ room_id }}',
-            name: userName.value
-        });
+        if (userName) {
+            socket.emit('leave', {
+                room_id: '{{ room_id }}',
+                name: userName
+            });
+        }
     });
+
+    // Initialize language display
+    updateLanguageDisplay();
 });
 </script>
 
 <style>
-.reaction-popup {
-    position: fixed;
-    bottom: 20px;
-    right: 20px;
-    background-color: rgba(0, 0, 0, 0.8);
-    color: white;
-    padding: 10px 20px;
-    border-radius: 20px;
-    animation: fadeInOut 2s ease-in-out;
+.transcript-box {
+    height: 200px;
+    overflow-y: auto;
+    padding: 10px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border: 1px solid #dee2e6;
+}
+
+.recording {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
 }
 
 @keyframes fadeInOut {
@@ -390,8 +660,36 @@ document.addEventListener('DOMContentLoaded', function() {
     100% { opacity: 0; transform: translateY(-20px); }
 }
 
-.form-switch {
+.history-container {
+    max-height: 300px;
+    overflow-y: auto;
+}
+
+.history-item {
+    transition: background-color 0.3s ease;
+}
+
+.history-item:hover {
+    background-color: rgba(13, 110, 253, 0.1);
+}
+
+.reaction-btn.active {
+    transform: scale(1.2);
+    transition: transform 0.2s ease;
+}
+
+.form-check-switch {
     padding-left: 2.5em;
+}
+
+.badge {
+    font-size: 0.75em;
+}
+
+#audioWaveform {
+    width: 100%;
+    background-color: #212529;
+    border-radius: 5px;
 }
 </style>
 {% endblock %}

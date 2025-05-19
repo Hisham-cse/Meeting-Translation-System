@@ -19,6 +19,19 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SESSION_SECRET")
 socketio = SocketIO(app, cors_allowed_origins="*")
 
+# Initialize translator globally
+translator = Translator()
+
+# Language code mapping to ensure consistency
+LANGUAGE_CODES = {
+    'kannada': 'kn',
+    'hindi': 'hi', 
+    'english': 'en',
+    'kn': 'kn',
+    'hi': 'hi',
+    'en': 'en'
+}
+
 try:
     # Configure MongoDB
     mongo_uri = os.environ.get('MONGO_URI')
@@ -45,24 +58,56 @@ try:
         if 'rooms' not in mongo.db.list_collection_names():
             mongo.db.create_collection('rooms')
             logger.info("Created rooms collection")
+        if 'translations' not in mongo.db.list_collection_names():
+            mongo.db.create_collection('translations')
+            logger.info("Created translations collection")
 
 except Exception as e:
     logger.error(f"Database Connection Error: {str(e)}")
     raise
+
+def normalize_language_code(lang_code):
+    """Normalize language code to standard format"""
+    if not lang_code:
+        return 'en'  # Default to English
+    
+    lang_code = lang_code.lower().strip()
+    return LANGUAGE_CODES.get(lang_code, lang_code)
 
 def generate_room_id():
     """Generate a random 6-character room ID"""
     return ''.join(random.choices(string.ascii_uppercase + string.digits, k=6))
 
 def get_translation(text, from_code, to_code):
-    """Translate text using Google Translate"""
+    """Translate text using Google Translate with improved error handling"""
+    if not text or not text.strip():
+        return text
+    
+    # Normalize language codes
+    from_code = normalize_language_code(from_code)
+    to_code = normalize_language_code(to_code)
+    
+    # If source and target are the same, return original text
+    if from_code == to_code:
+        return text
+    
     try:
-        translator = Translator()
-        result = translator.translate(text, src=from_code, dest=to_code)
-        logger.info(f"Translation successful: {text} -> {result.text}")
+        # Create a new translator instance for each request to avoid conflicts
+        local_translator = Translator()
+        
+        # Detect language if from_code is 'auto' or not specified
+        if from_code == 'auto' or not from_code:
+            detection = local_translator.detect(text)
+            from_code = detection.lang
+            logger.info(f"Detected language: {from_code}")
+        
+        # Perform translation
+        result = local_translator.translate(text, src=from_code, dest=to_code)
+        logger.info(f"Translation successful: {text[:50]}... [{from_code} -> {to_code}] -> {result.text[:50]}...")
         return result.text
     except Exception as e:
-        logger.error(f"Translation error: {str(e)}")
+        logger.error(f"Translation error: {str(e)} | Text: {text[:50]}... | {from_code} -> {to_code}")
+        # Return original text if translation fails
         return text
 
 @app.route('/')
@@ -97,7 +142,7 @@ def join_room_page(room_id):
 def on_join(data):
     room_id = data['room_id']
     name = data['name']
-    language = data['language']
+    language = normalize_language_code(data['language'])
 
     participant = {
         'name': name,
@@ -131,17 +176,32 @@ def on_leave(data):
 def handle_speech(data):
     room_id = data['room_id']
     text = data['text']
-    from_language = data['from_language']
+    from_language = normalize_language_code(data['from_language'])
+    
+    if not text or not text.strip():
+        return
 
     participants = list(mongo.db.participants.find({'room_id': room_id}))
+    
+    # Send original speech to all participants first
+    emit('speech_received', {
+        'original_text': text,
+        'from_language': from_language,
+        'timestamp': datetime.utcnow().isoformat()
+    }, room=room_id)
+    
+    # Then send translations for participants with different languages
     for participant in participants:
-        if participant['preferred_language'] != from_language:
-            translated_text = get_translation(text, from_language, participant['preferred_language'])
+        participant_lang = normalize_language_code(participant['preferred_language'])
+        if participant_lang != from_language:
+            translated_text = get_translation(text, from_language, participant_lang)
             emit('translated_speech', {
                 'original_text': text,
                 'translated_text': translated_text,
                 'from_language': from_language,
-                'to_language': participant['preferred_language']
+                'to_language': participant_lang,
+                'participant_name': participant['name'],
+                'timestamp': datetime.utcnow().isoformat()
             }, room=room_id)
 
 @socketio.on('reaction')
@@ -151,30 +211,80 @@ def handle_reaction(data):
     emoji = data['emoji']
     emit('reaction_received', {
         'name': name,
-        'emoji': emoji
+        'emoji': emoji,
+        'timestamp': datetime.utcnow().isoformat()
     }, room=room_id)
 
 @app.route('/translate', methods=['POST'])
 def translate():
-    data = request.json
-    text = data.get('text')
-    source_lang = data.get('sourceLang')
-    target_lang = data.get('targetLang')
-    room_id = data.get('roomId')
+    try:
+        data = request.json
+        if not data:
+            return jsonify({'error': 'No data provided'}), 400
+            
+        text = data.get('text', '').strip()
+        source_lang = normalize_language_code(data.get('sourceLang'))
+        target_lang = normalize_language_code(data.get('targetLang'))
+        room_id = data.get('roomId')
+        
+        if not text:
+            return jsonify({'error': 'No text provided'}), 400
+        
+        # Perform translation
+        translated_text = get_translation(text, source_lang, target_lang)
+        
+        # Store translation in database
+        translation_record = {
+            'original_text': text,
+            'translated_text': translated_text,
+            'source_language': source_lang,
+            'target_language': target_lang,
+            'timestamp': datetime.utcnow(),
+            'room_id': room_id
+        }
+        mongo.db.translations.insert_one(translation_record)
+        
+        return jsonify({
+            'translation': translated_text,
+            'source_language': source_lang,
+            'target_language': target_lang,
+            'original_text': text
+        })
+        
+    except Exception as e:
+        logger.error(f"Translation API error: {str(e)}")
+        return jsonify({'error': 'Translation failed'}), 500
 
-    translated = translator.translate(text, src=source_lang, dest=target_lang)
-
-    translation = {
-        'original_text': text,
-        'translated_text': translated.text,
-        'source_language': source_lang,
-        'target_language': target_lang,
-        'timestamp': datetime.utcnow(),
-        'room_id': room_id
+@app.route('/languages', methods=['GET'])
+def get_supported_languages():
+    """Return supported languages for the frontend"""
+    supported_languages = {
+        'en': 'English',
+        'hi': 'Hindi', 
+        'kn': 'Kannada'
     }
-    mongo.db.translations.insert_one(translation)
+    return jsonify(supported_languages)
 
-    return jsonify({'translation': translated.text})
+@app.route('/room/<room_id>/translations', methods=['GET'])
+def get_room_translations(room_id):
+    """Get translation history for a room"""
+    try:
+        translations = list(mongo.db.translations.find(
+            {'room_id': room_id},
+            {'_id': 0}
+        ).sort('timestamp', -1).limit(50))
+        return jsonify(translations)
+    except Exception as e:
+        logger.error(f"Error fetching translations: {str(e)}")
+        return jsonify({'error': 'Failed to fetch translations'}), 500
+
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({'error': 'Not found'}), 404
+
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({'error': 'Internal server error'}), 500
 
 if __name__ == '__main__':
     socketio.run(app, host='0.0.0.0', port=5000, debug=True)
